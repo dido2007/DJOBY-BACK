@@ -2,56 +2,69 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const { ObjectId } = require('mongoose').Types;
-const cookieParser = require('cookie-parser');
 const crypto = require("crypto");
+const sendVerificationSMS = require('../sms');
 
-// Importez la fonction sendVerificationSMS du fichier sms.js
-const { sendVerificationSMS } = require('./sms'); // Remplacez "./chemin/vers/sms.js" par le chemin réel
+module.exports = (db) => {
 
-router.post("/login", (request, response) => {
-  try {
-    const { phone_number, verification_code } = request.body;
+  router.post("/signup", async (req, res) => {
+    try {
+      const { phone_number } = req.body;
 
-    console.log(`${phone_number},  ${verification_code}`);
+      const existingUser = await db.collection('auth').findOne({
+        phone_number: phone_number,
+      });
 
-    // Vérifier d'abord si le numéro de téléphone existe dans la base de données
-    db.collection('auth').findOne({
-      phone_number: phone_number,
-    }, (err, user) => {
-      if (user === null) {
-        return response.json({
-          error: "Phone number not found. Please create an account first"
-        });
-      } else if (err) {
-        console.log(err);
-        return response.json({
-          error: "Error occurred while searching for the phone number"
+      if (existingUser) {
+        return res.json({
+          success: false,
+          error: "Phone number already registered. Please use a different number."
         });
       }
 
-      // Une fois que vous avez vérifié que le numéro de téléphone existe dans la base de données,
-      // appelez la fonction sendVerificationSMS pour envoyer le code de vérification
-      sendVerificationSMS(phone_number);
+      const verificationCode = await sendVerificationSMS(phone_number);
 
-      // Enregistrez le code de vérification généré dans une variable pour la vérification ultérieure
-      const storedVerificationCode = verificationCode;
+      await db.collection('auth').insertOne({
+        phone_number: phone_number,
+        verification_code: verificationCode.toString(),
+      });
 
-      // Le reste de votre code pour la vérification du code de l'utilisateur
-      // Comparez le code entré par l'utilisateur avec le code de vérification stocké
-      if (verification_code === storedVerificationCode.toString()) {
-        console.log('Le code de vérification est correct. Validation réussie !');
-        // Continuez avec le reste du processus de connexion réussie
-        return response.json({ message: "Login successful" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error(error);
+      return res.json({ success: false, error: "An error occurred" });
+    }
+  });
+
+  router.post("/login", async (req, res) => {
+    try {
+      const { phone_number, verification_code } = req.body;
+
+      const user = await db.collection('auth').findOne({
+        phone_number: phone_number,
+      });
+
+      if (!user) {
+        return res.json({
+          success: false,
+          error: "Phone number not found. Please sign up first"
+        });
+      }
+
+      // Sending the verification code to the phone number
+      const verificationSent = await sendVerificationSMS(phone_number, verification_code);
+
+      if (verificationSent) {
+        res.json({ success: true });
       } else {
-        console.log('Le code de vérification est incorrect. Validation échouée !');
-        return response.json({ error: "Invalid verification code" });
+        res.json({ success: false, error: "Error sending verification code" });
       }
-    });
-  } catch (error) {
-    // Gérez les erreurs ici
-    console.error(error);
-    return response.json({ error: "An error occurred" });
-  }
-});
+    } catch (error) {
+      console.error(error);
+      return res.json({ success: false, error: "An error occurred" });
+    }
+  });
 
-return router;
+
+  return router;
+};
