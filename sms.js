@@ -3,8 +3,8 @@ const twilio = require('twilio');
 
 let verificationCode = null;
 
-async function sendVerificationSMS(phoneNumber, code) {
-  verificationCode = code || Math.floor(100000 + Math.random() * 900000);
+async function sendVerificationSMS(phoneNumber) {
+  verificationCode = Math.floor(100000 + Math.random() * 900000);
 
   console.log(process.env.ACCOUNTSID);
   console.log(process.env.AUTHTOKEN);
