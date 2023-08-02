@@ -7,4 +7,4 @@ const VerificationCodePost = new Schema({
 });
 
 
-module.exports = mongoose.model('verifCode', VerificationCodePost);
+module.exports = mongoose.model('verifcodes', VerificationCodePost);

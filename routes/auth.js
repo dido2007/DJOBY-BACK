@@ -84,17 +84,32 @@ module.exports = (db) => {
 
   router.post("/verification", async (req, res) => {
     try {
-      const { phone_number_fromfront, verification_code_fromfront} = req.body; 
+      console.log("Request Body : " + req.body + "\n");
 
-      console.log("Numero de tel obtenu du front : " + phone_number_fromfront + "\n");
-      console.log("Code de verification obtenue du front : " + verification_code_fromfront + "\n");
+      console.log("Request Body phone_number : " + req.body.phone_number + "\n");
+
+      console.log("Request Body verification_code  : " + req.body.verification_code + "\n");
+
+      //Phone number et Verification code from the front
+      const code = req.body.verification_code;
+
+      const phone = req.body.phone_number;
+
+
+      console.log("Type Numero de tel obtenu du front : " + typeof phone + "\n");
       
-      const verifCode = await db.collection('VerificationCodePost').findOne({
-        phone_number: phone_number_fromfront,
-        verification_code: verification_code_fromfront,
+      console.log("Type Code de verification obtenue du front : " + typeof code + "\n");
+      
+      console.log("Numero de tel obtenu du front : " + phone + "\n");
+      
+      console.log("Code de verification obtenue du front : " + code + "\n");
+
+      const verifCode = await db.collection('verifcodes').findOne({
+        verification_code: parseInt(code),
+        phone_number: phone,
       });
 
-      console.log("Cherche des donnes du front dans la database : " + verifCode + '\n');
+      console.log("Cherche des donnes du front dans la database : " + verifCode + '\n' + '-------------------------------' + '\n');
 
       if (!verifCode) {
         return res.json({
@@ -104,6 +119,19 @@ module.exports = (db) => {
       } else{
         res.json({ success: true });
       }
+
+      const suppressionDuCode = await db.collection('verifcodes').deleteOne({
+        verification_code: parseInt(code),
+        phone_number: phone,
+      });
+
+      if (suppressionDuCode) {
+        console.log("Le code a ete supprime avec succes");
+      } else{
+        console.log("Erreur lors de la suppression du code");
+      }
+
+  
 
     }
     catch (error) {
