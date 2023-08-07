@@ -1,11 +1,11 @@
 require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
-const cors = require('cors');
-
+const cors = require('cors')
 // Express app initialization
 const app = express();
 
@@ -19,6 +19,19 @@ app.use(bodyParser.json());
 app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
+app.use(session({
+  secret:'REDACTED_SECRET',
+  resave: false,
+  saveUninitialized :false,
+  store: MongoStore.create({ 
+    mongoUrl: process.env.MONGO,
+    collection : 'sessions'
+  }),
+
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24
+  }
+  }));
 
 // DATABASE CONNECTION
 mongoose.connect(process.env.MONGO, {

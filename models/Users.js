@@ -9,6 +9,10 @@ const UsersSchema = mongoose.Schema({
   interestedServices: [String],
   skills: String,
   projectImages: [String],
+  position: {
+    latitude: { type: Number },
+    longitude: { type: Number }
+ }
 });
 
 module.exports = mongoose.model('Users', UsersSchema);

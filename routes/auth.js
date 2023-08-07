@@ -128,11 +128,38 @@ module.exports = (db) => {
         interestedServices: data.interestedservices,
         skills: data.skills,
         projectImages: req.files['projectImages'] ? req.files['projectImages'].map(file => file.path) : [],
+        position: {
+          latitude: data.position[0],
+          longitude: data.position[1],
+        }
       });
     
       await user.save()
+        .then(data => {
+          req.session.user = {
+            phoneNumber: user.phoneNumber,
+            fullName: user.fullName,
+            age: user.age,
+            avatar: user.avatar,
+            userType: user.userType,
+            interestedServices: user.interestedServices,
+            skills: user.skills,
+            projectImages: user.projectImages,
+            position: user.position
+          };
+          console.log("Session data set, attempting to save session");
+
+          req.session.save(err => {
+            if(err){
+              console.error("Error saving session:", err);
+              res.status(500).send({ message: "Error saving session" });
+            } else {
+              console.log("Session saved successfully");
+              res.send({success : true, data: data} );
+            }
+          });
+        })
       console.log("Utilisateur ajouté avec succès");
-      res.json({ success: true });
 
     } catch(error) {
       console.log("Echec lors de l'ajout du user dans la base de donne." + error + " \n ")
