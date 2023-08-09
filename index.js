@@ -20,7 +20,7 @@ app.use(express.static('public'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use('/uploads', express.static('uploads'));
 app.use(session({
-  secret:'REDACTED_SECRET',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized :false,
   store: MongoStore.create({ 

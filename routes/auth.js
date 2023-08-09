@@ -51,22 +51,28 @@ module.exports = (db) => {
       return verification_code;
     } catch (error) {
       console.error('Une erreur s\'est produite lors de l\'envoi du SMS :', error);
-      throw error;
+      return false
     }
   }
 
   const verificationSystem = async (phone_number) => {
-    const verificationSent = await sendVerificationSMS(phone_number);
-    console.log("Contenu de la variable verification sent : " + verificationSent + " \n ")
-    if (verificationSent) {
-      console.log(verification_code);
-      const verificationCodePost = new VerificationCodePost({verification_code, phone_number})
-      await verificationCodePost.save();
-      console.log("verification_code ajoute avec success : ", verificationCodePost + " \n ");
-      return true
-    } else {
-      console.log("Echec lors de l'ajout du code de verification dans la base de donne." + " \n ")
-      return false 
+    try {
+      const verificationSent = await sendVerificationSMS(phone_number);
+      console.log("Contenu de la variable verification sent : " + verificationSent + " \n ")
+      if (verificationSent) {
+        console.log(verification_code);
+        const verificationCodePost = new VerificationCodePost({verification_code, phone_number})
+        await verificationCodePost.save();
+        console.log("verification_code ajoute avec success : ", verificationCodePost + " \n ");
+        return true
+      } else {
+        console.log("Echec lors de l'ajout du code de verification dans la base de donne." + " \n ")
+        return false 
+      }
+    }
+    catch(error) {
+      console.error(error);
+      return res.json({ success: false, fallback: "Une erreur est survenue : " + error });
     }
   };
   
@@ -87,15 +93,18 @@ module.exports = (db) => {
         console.log("Numero de telephone pas trouve a la base de donnee" + " \n ");
         return res.json({
           success: false,
-          error: "Phone number not found. Please sign up first"
+          fallback: "Ce numero n'existe pas, veuillez en essayer un autre ou veuillez creer un compte."
         });
       }
 
-      res.json({ success: verificationSystem(phone_number) });
-      
+      if(verificationSystem(phone_number)){
+        res.json({ success: true, fallback: "Le code de verification a ete envoye avec succes" });
+      } else {
+        res.json({ success: false, fallback: "Une erreur est survenue lors de l envoi du code de verification" }); 
+      }      
     } catch (error) {
       console.error(error);
-      return res.json({ success: false, error: "An error occurred" });
+      return res.json({ success: false, fallback: "Une erreur est survenue : " + error });
     }
   });
 
@@ -104,8 +113,16 @@ module.exports = (db) => {
       const { phone_number } = req.body;
 
       console.log("La varibale phone_number est egale a : " + phone_number + " \n ")
+    
+      const user = await db.collection('users').findOne({
+        phoneNumber: phone_number,
+      });
 
-      res.json({ success: verificationSystem(phone_number) });
+      if(user){
+        res.json({ success: false, fallback: "l'utilisateur existe deja" });
+      } else {
+        res.json({ success: verificationSystem(phone_number), fallback: "Le code de verification a ete envoye avec succes." });
+      }
 
     } catch (error) {
       console.error(error);
@@ -133,33 +150,10 @@ module.exports = (db) => {
           longitude: data.position[1],
         }
       });
-    
-      await user.save()
-        .then(data => {
-          req.session.user = {
-            phoneNumber: user.phoneNumber,
-            fullName: user.fullName,
-            age: user.age,
-            avatar: user.avatar,
-            userType: user.userType,
-            interestedServices: user.interestedServices,
-            skills: user.skills,
-            projectImages: user.projectImages,
-            position: user.position
-          };
-          console.log("Session data set, attempting to save session");
 
-          req.session.save(err => {
-            if(err){
-              console.error("Error saving session:", err);
-              res.status(500).send({ message: "Error saving session" });
-            } else {
-              console.log("Session saved successfully");
-              res.send({success : true, data: data} );
-            }
-          });
-        })
-      console.log("Utilisateur ajouté avec succès");
+      await user.save()
+
+      res.json({success: true, fallback: "L'utilisateur a ete ajoute avec succes dans la base de donne"})
 
     } catch(error) {
       console.log("Echec lors de l'ajout du user dans la base de donne." + error + " \n ")
@@ -198,10 +192,10 @@ module.exports = (db) => {
       if (!verifCode) {
         return res.json({
           success: false,
-          error: "The verification code is wrong"
+          fallback: "The verification code is wrong"
         });
       } else{
-        res.json({ success: true });
+        res.json({ success: true, fallback: "Le code de verification est juste" });
       }
 
       const suppressionDuCode = await db.collection('verifcodes').deleteOne({
@@ -214,16 +208,55 @@ module.exports = (db) => {
       } else{
         console.log("Erreur lors de la suppression du code");
       }
-
-  
-
     }
     catch (error) {
       console.error('Une erreur s\'est produite lors de la verification du code de verification :', error);
       throw error;
     }
-  })
+  });
 
+  router.post("/session", async (req, res) => {
+    try{
+      const phone = req.body.phone_number;
+      console.log("Req body : " + req.body);
+      console.log("Phone number : " + phone);
+
+      const user = await db.collection('users').findOne({
+        phoneNumber: phone,
+      });
+
+      req.session.user = {
+        phoneNumber: user.phoneNumber,
+        fullName: user.fullName,
+        age: user.age,
+        avatar: user.avatar,
+        userType: user.userType,
+        interestedServices: user.interestedServices,
+        skills: user.skills,
+        projectImages: user.projectImages,
+        position: user.position      
+      }
+
+      console.log("User phone number " + user.phoneNumber) 
+      console.log("User position " + user.position)
+      console.log("User age " + user.age)
+      console.log("Session data set, attempting to save session");
+
+      req.session.save(err => {
+        if(err){
+          console.error("Error saving session:", err);
+          res.status(500).send({ success: false, fallback: "Une erreur est survenue lors de la sauvegarde de la session" });
+        } else {
+          console.log("Session saved successfully");
+          res.send({success : true, data: user, fallback: "La session a bien ete cree."} );
+        }
+        });
+    }
+    catch (error) {
+      console.error('Une erreur s\'est produite lors de la creation de la session :', error);
+      throw error;
+    }
+  });
 
   return router;
 };
