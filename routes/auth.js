@@ -3,10 +3,17 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const multer = require('multer');
-const twilio = require('twilio');
-const VerificationCodePost = require('../models/VerificationCodePost');
-const Users = require('../models/Users');
-
+const { User } = require('../models/models');
+const { VerifCode } = require('../models/models'); 
+var orangeConfiguration = {
+  proxy: {
+      protocol: 'http',
+      host: 'proxy.rd.francetelecom.fr',
+      port: 8080
+  },
+  strictSSL: false
+};
+const OrangeSMS = require('node-orangesms')(process.env.CLIENTID, process.env.CLIENTSECRET, orangeConfiguration);
 
 
 module.exports = (db) => {  
@@ -29,39 +36,35 @@ module.exports = (db) => {
   console.log("Valeur de depart du verification code : " + verification_code)
 
   async function sendVerificationSMS(phone_number) {
-    verification_code = Math.floor(100000 + Math.random() * 900000);
+    const verification_code = Math.floor(100000 + Math.random() * 900000);
   
-    console.log("Account SID : " + process.env.ACCOUNTSID + " \n ");
-    console.log("AUTHTOKEN : " + process.env.AUTHTOKEN + " \n ");
-    console.log("Code de verification : " + verification_code + " \n ");
+    console.log("Code de verification : " + verification_code);
   
-    try {
-      const twilioClient = twilio(process.env.ACCOUNTSID, process.env.AUTHTOKEN);
+    try {  
+      const senderAddress = 'tel:+20XXXXXXXXXX';
+      const senderName = 'Djoby';
   
-      console.log("Valeur de la variable twilioClient : " + twilioClient + " \n ");
-
-      const message = await twilioClient.messages.create({
-        body: `Bienvenue sur DJOBY. Votre code de vérification est : ${verification_code}`,
-        from: process.env.TWILIONUMBER,
-        to: phone_number,
-      });
+      const recipient = "+216" + phone_number;
+      const content = `Bienvenue sur DJOBY. Votre code de vérification est : ${verification_code}`;
   
-      console.log(`SMS envoyé avec succès. SID du message : ${message.sid}`);
+      const orangeSmsResponse = await OrangeSMS.sendSMS(recipient, content, senderAddress, senderName);
+      console.log("Orange SMS response:", orangeSmsResponse);
   
       return verification_code;
     } catch (error) {
       console.error('Une erreur s\'est produite lors de l\'envoi du SMS :', error);
-      return false
+      return false;
     }
   }
 
-  const verificationSystem = async (phone_number) => {
+  
+  async function verificationSystem (phone_number) {
     try {
       const verificationSent = await sendVerificationSMS(phone_number);
       console.log("Contenu de la variable verification sent : " + verificationSent + " \n ")
       if (verificationSent) {
         console.log(verification_code);
-        const verificationCodePost = new VerificationCodePost({verification_code, phone_number})
+        const verificationCodePost = new VerifCode({verification_code, phone_number})
         await verificationCodePost.save();
         console.log("verification_code ajoute avec success : ", verificationCodePost + " \n ");
         return true
@@ -83,8 +86,8 @@ module.exports = (db) => {
 
       console.log("La varibale phone_number est egale a : " + phone_number + " \n ")
 
-      const user = await db.collection('auth').findOne({
-        phone_number: phone_number,
+      const user = await db.collection('users').findOne({
+        phoneNumber: phone_number,
       });
 
       console.log("Le resultat de la requete a la blase de donnee : " + user + " \n ")
@@ -136,7 +139,7 @@ module.exports = (db) => {
 
       const data = JSON.parse(req.body.data); // Parsez la chaîne JSON dans un objet
 
-      const user = new Users({
+      const user = new User({
         phoneNumber: data.phone,
         fullName: data.fullname,
         age: data.age,

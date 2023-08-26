@@ -46,7 +46,9 @@ db.once('open', () => console.log('Connected to the Database'));
 
 // Import routes and configuration
 const authRoutes = require('./routes/auth')(db);
+const layoutRoutes = require('./routes/layout')(db);
 
 app.use('/api/auth', authRoutes);
+app.use('/api/layout', layoutRoutes);
 
 app.listen(process.env.PORT, () => console.log(`Server listening on port ${process.env.PORT}`));
